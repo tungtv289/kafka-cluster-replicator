@@ -42,6 +42,7 @@ public class HttpKafkaClientImpl implements KafkaService {
     public int executeBatch(List<KafkaRecord> records, TopicId topic) throws IOException {
 //        String endpoint = String.format("%s/v3/clusters/%s/topics/%s/records", baseUrl, clusterId, topic.topicName());
         String endpoint = String.format("%s/v3/clusters/%s/topics/%s/records", baseUrl, clusterId, "admin_service_db_avro");
+        log.info(endpoint);
         // Prepare payload
         KafkaRestV3Payload payload = new KafkaRestV3Payload(records);
         // Serialize payload to JSON
@@ -61,10 +62,10 @@ public class HttpKafkaClientImpl implements KafkaService {
 
     // Payload wrapper for REST Proxy API v3
     static class KafkaRestV3Payload {
-        public final List<KafkaRecord> records;
+        public final List<KafkaRecord> entries;
 
-        public KafkaRestV3Payload(List<KafkaRecord> records) {
-            this.records = records;
+        public KafkaRestV3Payload(List<KafkaRecord> entries) {
+            this.entries = entries;
         }
     }
 }

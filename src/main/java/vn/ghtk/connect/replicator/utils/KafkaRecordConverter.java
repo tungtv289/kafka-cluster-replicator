@@ -1,17 +1,17 @@
 package vn.ghtk.connect.replicator.utils;
 
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.sink.SinkRecord;
 
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 public class KafkaRecordConverter {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -22,7 +22,7 @@ public class KafkaRecordConverter {
         // Convert Key
         if (sinkRecord.key() != null) {
             kafkaRecord.key = new KafkaRecord.Key();
-            kafkaRecord.key.data = extractData(sinkRecord.key(), sinkRecord.keySchema());
+            kafkaRecord.key.data = extractJsonNode(sinkRecord.key(), sinkRecord.keySchema());
             kafkaRecord.key.type = determineType(sinkRecord.keySchema(), sinkRecord.key());
         }
 
@@ -40,29 +40,29 @@ public class KafkaRecordConverter {
         return kafkaRecord;
     }
 
-    private static String extractData(Object data, Schema schema) {
-        if (data instanceof byte[]) {
-            return Base64.getEncoder().encodeToString((byte[]) data);
-        } else if (data instanceof String) {
-            return (String) data;
-        } else {
-            return data.toString(); // Fallback for other types
+    private static Map<String, Object> structToMap(Struct struct) {
+        if (struct == null) {
+            return null;
         }
+
+        Map<String, Object> map = new HashMap<>();
+        Schema schema = struct.schema();
+
+        for (Field field : schema.fields()) {
+            Object value = struct.get(field);
+            if (value instanceof Struct) {
+                // Recursively convert nested Structs
+                value = structToMap((Struct) value);
+            }
+            map.put(field.name(), value);
+        }
+
+        return map;
     }
 
     private static JsonNode extractJsonNode(Object data, Schema schema) throws Exception {
         if (data instanceof Struct || schema != null) {
-            Struct struct = (Struct) data;
-            Map<String, Object> structData = new HashMap<>();
-
-            // Extract all fields from the Struct
-            for (Field field : schema.fields()) {
-                Object fieldValue = struct.get(field);
-                structData.put(field.name(), fieldValue);
-            }
-
-            // Convert the Struct to a JSON-friendly Map
-            return objectMapper.valueToTree(structData);
+            return objectMapper.valueToTree(structToMap((Struct) data));
         } else if (data instanceof String) {
             // Parse string to JSON if possible
             return objectMapper.readTree((String) data);
