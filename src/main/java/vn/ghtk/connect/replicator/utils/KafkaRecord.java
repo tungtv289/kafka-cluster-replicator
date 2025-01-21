@@ -1,5 +1,6 @@
 package vn.ghtk.connect.replicator.utils;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,10 +25,35 @@ public class KafkaRecord {
     // Record Value
     public static class Value {
         public Type type; // "JSON", "AVRO", "STRING"
-        public JsonNode data; // Flexible to handle JSON or plain data
-        public Object schema; // Schema for "AVRO"
+        public Object data; // Flexible to handle JSON or plain data
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public String schema; // Optional: for AVRO or schema-based data
+
+        public Value() {
+        }
+
+        public Value(Type type, Object data, String schema) {
+            this.type = type;
+            this.data = data;
+            this.schema = schema;
+        }
+
+        // Custom getter for schema to exclude it when type is "JSON"
+        @JsonIgnore
+        public String getSchema() {
+            return type.equals("JSON") ? null : this.schema;
+        }
+
+        // Jackson will still look for this field; we explicitly tell it not to serialize
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public String getSerializedSchema() {
+            return getSchema();
+        }
+
     }
 
+    public String id;
     public Key key;
     public Value value;
 
@@ -35,7 +61,8 @@ public class KafkaRecord {
     @Override
     public String toString() {
         return "KafkaRecord{" +
-                "key=" + key +
+                "id=" + id +
+                ", key=" + key +
                 ", value=" + value +
                 '}';
     }

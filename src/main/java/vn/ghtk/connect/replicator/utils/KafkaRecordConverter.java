@@ -32,7 +32,9 @@ public class KafkaRecordConverter {
             kafkaRecord.value.data = extractJsonNode(sinkRecord.value(), sinkRecord.valueSchema());
             kafkaRecord.value.type = determineType(sinkRecord.valueSchema(), sinkRecord.value());
 
-            if (sinkRecord.valueSchema() != null) {
+            if (sinkRecord.valueSchema() != null &&
+                    kafkaRecord.value.type == KafkaRecord.Type.AVRO
+            ) {
                 kafkaRecord.value.schema = sinkRecord.valueSchema().toString(); // Raw schema if available
             }
         }

@@ -80,8 +80,12 @@ public class BufferedRecords {
         }
         log.debug("Flushing {} buffered records", records.size());
         List<KafkaRecord> kafkaRecords = new ArrayList<>();
+        int counter = 1; // Initialize the counter
         for (SinkRecord record : records) {
-            kafkaRecords.add(KafkaRecordConverter.convert(record));
+            KafkaRecord tmp = KafkaRecordConverter.convert(record);
+            tmp.id = String.valueOf(counter);
+            kafkaRecords.add(tmp);
+            counter++;
         }
         executeProducer(kafkaRecords);
 
@@ -92,6 +96,7 @@ public class BufferedRecords {
 
     private void executeProducer(List<KafkaRecord> idxRecords) throws KafkaRestBatchUpdateException, IOException {
         int batchStatus = kafkaService.executeBatch(idxRecords, topicName);
+        log.info(String.valueOf(batchStatus));
         if (batchStatus != 200) {
             throw new KafkaRestBatchUpdateException(
                     "Execution failed for part of the batch update: " + batchStatus);

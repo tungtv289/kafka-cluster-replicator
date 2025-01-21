@@ -41,7 +41,7 @@ public class HttpKafkaClientImpl implements KafkaService {
     @Override
     public int executeBatch(List<KafkaRecord> records, TopicId topic) throws IOException {
 //        String endpoint = String.format("%s/v3/clusters/%s/topics/%s/records", baseUrl, clusterId, topic.topicName());
-        String endpoint = String.format("%s/v3/clusters/%s/topics/%s/records", baseUrl, clusterId, "admin_service_db_avro");
+        String endpoint = String.format("%s/v3/clusters/%s/topics/%s/records:batch", baseUrl, clusterId, "admin_service_db_avro");
         log.info(endpoint);
         // Prepare payload
         KafkaRestV3Payload payload = new KafkaRestV3Payload(records);
