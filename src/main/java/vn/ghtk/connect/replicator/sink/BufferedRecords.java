@@ -4,17 +4,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.sink.SinkRecord;
 import vn.ghtk.connect.replicator.config.SinkConfig;
+import vn.ghtk.connect.replicator.utils.KafkaRecord;
 import vn.ghtk.connect.replicator.service.kafka.HttpKafkaClientImpl;
 import vn.ghtk.connect.replicator.service.kafka.KafkaService;
 import vn.ghtk.connect.replicator.sink.metadata.SchemaPair;
+import vn.ghtk.connect.replicator.utils.KafkaRecordConverter;
+import vn.ghtk.connect.replicator.utils.KafkaRestBatchUpdateException;
 import vn.ghtk.connect.replicator.utils.TopicId;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
-import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
 
 @Slf4j
 public class BufferedRecords {
@@ -34,7 +35,7 @@ public class BufferedRecords {
     ) {
         this.topicName = topicName;
         this.config = config;
-        this.kafkaService = new HttpKafkaClientImpl(config.kafkaRestBaseUrl, config.kafkaRestUsername(), config.kafkaRestPassword());
+        this.kafkaService = new HttpKafkaClientImpl(config.kafkaRestBaseUrl, config.clusterId, config.kafkaRestUsername(), config.kafkaRestPassword());
 
     }
 
@@ -47,10 +48,7 @@ public class BufferedRecords {
             schemaChanged = true;
         }
         if (Objects.equals(valueSchema, record.valueSchema())) {
-            if (config.deleteEnabled && deletesInBatch) {
-                // flush so an insert after a delete of same record isn't lost
-                flushed.addAll(flush());
-            }
+            flushed.addAll(flush());
         } else {
             // value schema is not null and has changed. This is a real schema change.
             valueSchema = record.valueSchema();
@@ -65,42 +63,6 @@ public class BufferedRecords {
                     record.keySchema(),
                     record.valueSchema()
             );
-
-            final String insertSql = getInsertSql();
-            final String deleteSql = getDeleteSql();
-            log.debug(
-                    "{} sql: {} deleteSql: {} meta: {}",
-                    config.insertMode,
-                    insertSql,
-                    deleteSql,
-                    fieldsMetadata
-            );
-            close();
-            updatePreparedStatement = dbDialect.createPreparedStatement(connection, insertSql);
-            updateStatementBinder = dbDialect.statementBinder(
-                    updatePreparedStatement,
-                    config.pkMode,
-                    schemaPair,
-                    fieldsMetadata,
-                    dbStructure.tableDefinition(connection, topicName),
-                    config.insertMode
-            );
-            if (config.deleteEnabled && nonNull(deleteSql)) {
-                deletePreparedStatement = dbDialect.createPreparedStatement(connection, deleteSql);
-                deleteStatementBinder = dbDialect.statementBinder(
-                        deletePreparedStatement,
-                        config.pkMode,
-                        schemaPair,
-                        fieldsMetadata,
-                        dbStructure.tableDefinition(connection, topicName),
-                        config.insertMode
-                );
-            }
-        }
-
-        // set deletesInBatch if schema value is not null
-        if (isNull(record.value()) && config.deleteEnabled) {
-            deletesInBatch = true;
         }
 
         records.add(record);
@@ -117,103 +79,22 @@ public class BufferedRecords {
             return new ArrayList<>();
         }
         log.debug("Flushing {} buffered records", records.size());
+        List<KafkaRecord> kafkaRecords = new ArrayList<>();
         for (SinkRecord record : records) {
-            updateStatementBinder.bindRecord(record);
+            kafkaRecords.add(KafkaRecordConverter.convert(record));
         }
-        executeUpdates();
+        executeProducer(kafkaRecords);
 
         final List<SinkRecord> flushedRecords = records;
         records = new ArrayList<>();
-        deletesInBatch = false;
         return flushedRecords;
     }
 
-    private void executeUpdates() throws SQLException {
-        kafkaService.execute();
-        int[] batchStatus = updatePreparedStatement.executeBatch();
-        for (int updateCount : batchStatus) {
-            if (updateCount == Statement.EXECUTE_FAILED) {
-                throw new BatchUpdateException(
-                        "Execution failed for part of the batch update", batchStatus);
-            }
+    private void executeProducer(List<KafkaRecord> idxRecords) throws KafkaRestBatchUpdateException, IOException {
+        int batchStatus = kafkaService.executeBatch(idxRecords, topicName);
+        if (batchStatus != 200) {
+            throw new KafkaRestBatchUpdateException(
+                    "Execution failed for part of the batch update: " + batchStatus);
         }
-    }
-
-    private String getInsertSql() throws SQLException {
-        switch (config.insertMode) {
-            case INSERT:
-                return dbDialect.buildInsertStatement(
-                        topicName,
-                        asColumns(fieldsMetadata.keyFieldNames),
-                        asColumns(fieldsMetadata.nonKeyFieldNames),
-                        dbStructure.tableDefinition(connection, topicName)
-                );
-            case UPSERT:
-                if (fieldsMetadata.keyFieldNames.isEmpty()) {
-                    throw new ConnectException(String.format(
-                            "Write to table '%s' in UPSERT mode requires key field names to be known, check the"
-                                    + " primary key configuration",
-                            topicName
-                    ));
-                }
-                try {
-                    return dbDialect.buildUpsertQueryStatement(
-                            topicName,
-                            asColumns(fieldsMetadata.keyFieldNames),
-                            asColumns(fieldsMetadata.nonKeyFieldNames),
-                            dbStructure.tableDefinition(connection, topicName)
-                    );
-                } catch (UnsupportedOperationException e) {
-                    throw new ConnectException(String.format(
-                            "Write to table '%s' in UPSERT mode is not supported with the %s dialect.",
-                            topicName,
-                            dbDialect.name()
-                    ));
-                }
-            case UPDATE:
-                return dbDialect.buildUpdateStatement(
-                        topicName,
-                        asColumns(fieldsMetadata.keyFieldNames),
-                        asColumns(fieldsMetadata.nonKeyFieldNames),
-                        dbStructure.tableDefinition(connection, topicName)
-                );
-            default:
-                throw new ConnectException("Invalid insert mode");
-        }
-    }
-
-    private String getDeleteSql() {
-        String sql = null;
-        if (config.deleteEnabled) {
-            switch (config.pkMode) {
-                case RECORD_KEY:
-                    if (fieldsMetadata.keyFieldNames.isEmpty()) {
-                        throw new ConnectException("Require primary keys to support delete");
-                    }
-                    try {
-                        sql = dbDialect.buildDeleteStatement(
-                                topicName,
-                                asColumns(fieldsMetadata.keyFieldNames)
-                        );
-                    } catch (UnsupportedOperationException e) {
-                        throw new ConnectException(String.format(
-                                "Deletes to table '%s' are not supported with the %s dialect.",
-                                topicName,
-                                dbDialect.name()
-                        ));
-                    }
-                    break;
-
-                default:
-                    throw new ConnectException("Deletes are only supported for pk.mode record_key");
-            }
-        }
-        return sql;
-    }
-
-    private Collection<ColumnId> asColumns(Collection<String> names) {
-        return names.stream()
-                .map(name -> new ColumnId(topicName, name))
-                .collect(Collectors.toList());
     }
 }

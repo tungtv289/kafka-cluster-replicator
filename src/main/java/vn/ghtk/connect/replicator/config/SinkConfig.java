@@ -13,6 +13,8 @@ public class SinkConfig extends AbstractConfig {
 
     public static final String KAFKA_REST_BASE_URL = "kafka.rest.url";
 
+    public static final String KAFKA_REST_CLUSTER_ID = "kafka.rest.clusterId";
+
     public static final String KAFKA_REST_USERNAME_CONFIG = "kafka.rest.username";
     private static final String KAFKA_REST_USERNAME_DOC = "kafka.rest.username";
     private static final String KAFKA_REST_USERNAME_DISPLAY = "Connection Username";
@@ -80,6 +82,17 @@ public class SinkConfig extends AbstractConfig {
                         ++order,
                         ConfigDef.Width.SHORT,
                         KAFKA_REST_PASSWORD_DISPLAY
+                )
+                .define(
+                        KAFKA_REST_CLUSTER_ID,
+                        ConfigDef.Type.STRING,
+                        null,
+                        ConfigDef.Importance.HIGH,
+                        KAFKA_REST_CLUSTER_ID,
+                        KAFKA_REST_CLUSTER_ID,
+                        1,
+                        ConfigDef.Width.LONG,
+                        KAFKA_REST_CLUSTER_ID
                 ).define(
                 BATCH_SIZE,
                 ConfigDef.Type.INT,
@@ -136,6 +149,7 @@ public class SinkConfig extends AbstractConfig {
 
     public final String connectorName;
     public final String kafkaRestBaseUrl;
+    public final String clusterId;
 
     public final int batchSize;
 
@@ -143,6 +157,7 @@ public class SinkConfig extends AbstractConfig {
     public SinkConfig(Map<?, ?> originals) {
         super(CONFIG_DEF, originals);
         kafkaRestBaseUrl = getString(KAFKA_REST_BASE_URL);
+        clusterId = getString(KAFKA_REST_CLUSTER_ID);
         connectorName = originals.containsKey("name") ? originals.get("name").toString() : null;
         batchSize = getInt(BATCH_SIZE);
     }

@@ -1,29 +1,21 @@
 package vn.ghtk.connect.replicator.sink;
 
-import com.google.gson.Gson;
 import io.confluent.connect.avro.AvroData;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
-import org.json.JSONObject;
 import vn.ghtk.connect.replicator.config.SinkConfig;
-import vn.ghtk.connect.replicator.constants.StringConstants;
-import vn.ghtk.connect.replicator.model.entity.es.IndexableRecord;
-import vn.ghtk.connect.replicator.model.entity.es.Key;
-import vn.ghtk.connect.replicator.utils.DateTimeUtils;
 import vn.ghtk.connect.replicator.utils.TopicId;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 public class ReplicatorWriter implements SinkWriter {
 
     private final String taskId;
     private final SinkConfig config;
-    private final Gson gson = new Gson();
 
     public ReplicatorWriter(String taskId, SinkConfig config) {
         this.config = config;
@@ -56,42 +48,6 @@ public class ReplicatorWriter implements SinkWriter {
         }
         long deltaTime = Math.max(System.currentTimeMillis() - startTime, 1);
         log.info("[Task {}] Process {} records in {} ms, speed {} records/sec", taskId, sinkRecords.size(), deltaTime, (sinkRecords.size() * 1000) / deltaTime);
-    }
-
-    private void handleMessages(Collection<SinkRecord> sinkRecords) {
-        List<IndexableRecord> indexableRecords = new ArrayList<>();
-        for (SinkRecord sinkRecord : sinkRecords) {
-            if (!StringConstants.TOPIC_MESSAGES.equals(sinkRecord.topic())) {
-                continue;
-            }
-            JSONObject jsonObject = new JSONObject(sinkRecord.value().toString());
-            JSONObject message = jsonObject.getJSONObject("data").getJSONObject("message");
-
-            String messageId = message.getString("id");
-            String channelId = message.getString("channel_id");
-            String msgType = message.getString("msg_type");
-            String text = message.optString("text");
-            String created_at = message.getString("created_at");
-            if (StringUtils.isBlank(text)) {
-                continue;
-            }
-
-            String created = DateTimeUtils.convertTimestamp(DateTimeUtils.convertZuluTime2Date(created_at));
-            String partition = created.substring(0, 7).replace("-", "");
-
-
-            Key key = new Key("messages-" + partition, "_doc", String.valueOf(messageId), channelId);
-            IndexableRecord indexableRecord = new IndexableRecord(key, "gson.toJson(messageES)", 1L);
-            indexableRecords.add(indexableRecord);
-        }
-        if (CollectionUtils.isEmpty(indexableRecords)) {
-            return;
-        }
-        try {
-//            kafkaService.execute(indexableRecords);
-        } catch (Exception e) {
-            throw new ConnectException(e);
-        }
     }
 
     /**
