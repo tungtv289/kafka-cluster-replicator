@@ -57,6 +57,7 @@ public class HttpKafkaClientImpl implements KafkaService {
         httpRequest.setHeader("Content-Type", "application/json");
 
         HttpResponseText httpData = httpService.execute(httpRequest);
+        log.error(httpData.getText());
         return httpData.getCode();
     }
 

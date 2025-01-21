@@ -97,7 +97,7 @@ public class BufferedRecords {
     private void executeProducer(List<KafkaRecord> idxRecords) throws KafkaRestBatchUpdateException, IOException {
         int batchStatus = kafkaService.executeBatch(idxRecords, topicName);
         log.info(String.valueOf(batchStatus));
-        if (batchStatus != 200) {
+        if (batchStatus != 207) {
             throw new KafkaRestBatchUpdateException(
                     "Execution failed for part of the batch update: " + batchStatus);
         }
