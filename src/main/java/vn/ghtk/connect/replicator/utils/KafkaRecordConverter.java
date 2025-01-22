@@ -1,7 +1,7 @@
 package vn.ghtk.connect.replicator.utils;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.confluent.connect.avro.AvroData;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
@@ -24,6 +24,9 @@ public class KafkaRecordConverter {
             kafkaRecord.key = new KafkaRecord.Key();
             kafkaRecord.key.data = extractJsonNode(sinkRecord.key(), sinkRecord.keySchema());
             kafkaRecord.key.type = determineType(sinkRecord.keySchema(), sinkRecord.key());
+            if (sinkRecord.keySchema() != null) {
+                kafkaRecord.key.schema = convertConnectSchemaToAvroSchema(sinkRecord.keySchema());
+            }
         }
 
         // Convert Value
@@ -31,11 +34,8 @@ public class KafkaRecordConverter {
             kafkaRecord.value = new KafkaRecord.Value();
             kafkaRecord.value.data = extractJsonNode(sinkRecord.value(), sinkRecord.valueSchema());
             kafkaRecord.value.type = determineType(sinkRecord.valueSchema(), sinkRecord.value());
-
-            if (sinkRecord.valueSchema() != null &&
-                    kafkaRecord.value.type == KafkaRecord.Type.AVRO
-            ) {
-                kafkaRecord.value.schema = sinkRecord.valueSchema().toString(); // Raw schema if available
+            if (sinkRecord.valueSchema() != null) {
+                kafkaRecord.value.schema = convertConnectSchemaToAvroSchema(sinkRecord.valueSchema());
             }
         }
 
@@ -53,8 +53,17 @@ public class KafkaRecordConverter {
         for (Field field : schema.fields()) {
             Object value = struct.get(field);
             if (value instanceof Struct) {
-                // Recursively convert nested Structs
-                value = structToMap((Struct) value);
+                if (!field.schema().name().startsWith("io.debezium.connector")) {
+                    Map<String, Object> nestedMap = new HashMap<>();
+                    nestedMap.put(field.schema().name(), structToMap((Struct) value));
+                    value = nestedMap;
+                } else {
+                    value = structToMap((Struct) value);
+                }
+            }  else if (field.schema().isOptional()) {
+                Map<String, Object> optionalMap = new HashMap<>();
+                optionalMap.put(field.schema().valueSchema().type().name().toLowerCase(), value);
+                value = optionalMap;
             }
             map.put(field.name(), value);
         }
@@ -62,12 +71,12 @@ public class KafkaRecordConverter {
         return map;
     }
 
-    private static JsonNode extractJsonNode(Object data, Schema schema) throws Exception {
+    private static Object extractJsonNode(Object data, Schema schema) throws Exception {
         if (data instanceof Struct || schema != null) {
             return objectMapper.valueToTree(structToMap((Struct) data));
         } else if (data instanceof String) {
             // Parse string to JSON if possible
-            return objectMapper.readTree((String) data);
+            return (String) data;
         } else {
             // Treat as plain value
             return objectMapper.valueToTree(data);
@@ -79,11 +88,27 @@ public class KafkaRecordConverter {
             return KafkaRecord.Type.STRING;
         } else if (schema == null && data instanceof byte[]) {
             return KafkaRecord.Type.BINARY;
-        } else if (schema != null && "AVRO".equals(schema.name())) {
-            return KafkaRecord.Type.AVRO;
         } else if (schema != null) {
-            return KafkaRecord.Type.JSON; // Assume JSON for other structured schemas
+            return KafkaRecord.Type.AVRO;
         }
-        return KafkaRecord.Type.STRING; // Default fallback
+        return KafkaRecord.Type.STRING;
     }
+
+    /**
+     * Converts a Kafka Connect Schema to an Avro JSON Schema using AvroData.
+     *
+     * @param connectSchema Kafka Connect Schema
+     * @return Avro Schema JSON string
+     */
+    public static String convertConnectSchemaToAvroSchema(Schema connectSchema) {
+        // Initialize AvroData for schema conversions
+        AvroData avroData = new AvroData(1); // The parameter specifies the Avro schema version
+        // Convert Connect Schema to Avro Schema
+        org.apache.avro.Schema avroSchema = avroData.fromConnectSchema(connectSchema);
+        // Convert Avro Schema to JSON and return
+//        return avroSchema.toString(true); // Pretty-print the JSON
+//        return avroSchema.toString(false).replace("\"", "\\\""); // Pretty-print the JSON
+        return avroSchema.toString(false); // Pretty-print the JSON
+    }
+
 }

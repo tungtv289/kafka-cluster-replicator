@@ -3,28 +3,43 @@ package vn.ghtk.connect.replicator.utils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class KafkaRecord {
-
     // Enum for Type
     public enum Type {
         @JsonProperty("BINARY") BINARY,
         @JsonProperty("JSON") JSON,
+        @JsonProperty("STRING") STRING,
         @JsonProperty("AVRO") AVRO,
-        @JsonProperty("STRING") STRING
+        @JsonProperty("JSONSCHEMA") JSONSCHEMA,
+        @JsonProperty("PROTOBUF") PROTOBUF
     }
 
     // Record Key
     public static class Key {
-        public Type type; // "BINARY"
-        public Object data; // Base64-encoded binary data
+        public Type type;
+        public Object data;  // Flexible to handle JSON or plain data
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public String schema; // Optional: for AVRO or schema-based data
+
+        // Custom getter for schema to exclude it when type is "JSON"
+        @JsonIgnore
+        public String normalizeSchema() {
+            return type.equals("JSON") ? null : this.schema;
+        }
+
+        // Jackson will still look for this field; we explicitly tell it not to serialize
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public String getSchema() {
+            return normalizeSchema();
+        }
     }
 
     // Record Value
     public static class Value {
-        public Type type; // "JSON", "AVRO", "STRING"
+        public Type type;
         public Object data; // Flexible to handle JSON or plain data
 
         @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -41,14 +56,14 @@ public class KafkaRecord {
 
         // Custom getter for schema to exclude it when type is "JSON"
         @JsonIgnore
-        public String getSchema() {
+        public String normalizeSchema() {
             return type.equals("JSON") ? null : this.schema;
         }
 
         // Jackson will still look for this field; we explicitly tell it not to serialize
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        public String getSerializedSchema() {
-            return getSchema();
+        public String getSchema() {
+            return normalizeSchema();
         }
 
     }

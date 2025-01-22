@@ -49,21 +49,4 @@ public class ReplicatorWriter implements SinkWriter {
         long deltaTime = Math.max(System.currentTimeMillis() - startTime, 1);
         log.info("[Task {}] Process {} records in {} ms, speed {} records/sec", taskId, sinkRecords.size(), deltaTime, (sinkRecords.size() * 1000) / deltaTime);
     }
-
-    /**
-     * Converts a Kafka Connect Schema to an Avro JSON Schema using AvroData.
-     *
-     * @param connectSchema Kafka Connect Schema
-     * @return Avro Schema JSON string
-     */
-    private String convertConnectToAvro(Schema connectSchema) {
-        // Initialize AvroData for schema conversions
-        AvroData avroData = new AvroData(1); // The parameter specifies the Avro schema version
-        // Convert Connect Schema to Avro Schema
-        org.apache.avro.Schema avroSchema = avroData.fromConnectSchema(connectSchema);
-        // Convert Avro Schema to JSON and return
-//        return avroSchema.toString(true); // Pretty-print the JSON
-        return avroSchema.toString(false).replace("\"", "\\\""); // Pretty-print the JSON
-//        return avroSchema.toString(false); // Pretty-print the JSON
-    }
 }
