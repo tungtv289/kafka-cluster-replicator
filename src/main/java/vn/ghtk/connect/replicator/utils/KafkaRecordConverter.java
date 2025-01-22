@@ -3,6 +3,7 @@ package vn.ghtk.connect.replicator.utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.confluent.connect.avro.AvroData;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.connect.data.ConnectSchema;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
@@ -28,7 +29,6 @@ public class KafkaRecordConverter {
                 kafkaRecord.key.schema = convertConnectSchemaToAvroSchema(sinkRecord.keySchema());
             }
         }
-
         // Convert Value
         if (sinkRecord.value() != null) {
             kafkaRecord.value = new KafkaRecord.Value();
@@ -38,7 +38,6 @@ public class KafkaRecordConverter {
                 kafkaRecord.value.schema = convertConnectSchemaToAvroSchema(sinkRecord.valueSchema());
             }
         }
-
         return kafkaRecord;
     }
 
@@ -52,7 +51,7 @@ public class KafkaRecordConverter {
 
         for (Field field : schema.fields()) {
             Object value = struct.get(field);
-            if (value instanceof Struct) {
+            if (field.schema().type().equals(Schema.Type.STRUCT)) {
                 if (!field.schema().name().startsWith("io.debezium.connector")) {
                     Map<String, Object> nestedMap = new HashMap<>();
                     nestedMap.put(field.schema().name(), structToMap((Struct) value));
@@ -60,9 +59,9 @@ public class KafkaRecordConverter {
                 } else {
                     value = structToMap((Struct) value);
                 }
-            }  else if (field.schema().isOptional()) {
+            }  else if (field.schema().isOptional() && value != null) {
                 Map<String, Object> optionalMap = new HashMap<>();
-                optionalMap.put(field.schema().valueSchema().type().name().toLowerCase(), value);
+                optionalMap.put(field.schema().type().getName(), value);
                 value = optionalMap;
             }
             map.put(field.name(), value);
