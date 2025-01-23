@@ -55,13 +55,13 @@ public class KafkaRecordConverter {
         for (Field field : schema.fields()) {
             Object value = struct.get(field);
             if (field.schema().type().equals(Schema.Type.STRUCT)) {
-                if (!field.schema().name().startsWith("io.debezium.connector")) {
-                    Map<String, Object> nestedMap = new HashMap<>();
-                    nestedMap.put(field.schema().name(), structToMap((Struct) value));
-                    value = nestedMap;
-                } else {
+//                if (!field.schema().name().startsWith("io.debezium.connector")) {
+//                    Map<String, Object> nestedMap = new HashMap<>();
+//                    nestedMap.put(field.schema().name(), structToMap((Struct) value));
+//                    value = nestedMap;
+//                } else {
                     value = structToMap((Struct) value);
-                }
+//                }
             } else if (field.schema().isOptional() && value != null) {
                 Map<String, Object> optionalMap = new HashMap<>();
                 optionalMap.put(field.schema().type().getName(), value);

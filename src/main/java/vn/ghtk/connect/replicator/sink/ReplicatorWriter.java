@@ -23,7 +23,7 @@ public class ReplicatorWriter implements SinkWriter {
     }
 
     @Override
-    public void writer(Collection<SinkRecord> sinkRecords) {
+    public void writer(Collection<SinkRecord> sinkRecords) throws Exception {
         long startTime = System.currentTimeMillis();
         try {
             final Map<TopicId, BufferedRecords> bufferByTable = new HashMap<>();
@@ -44,7 +44,7 @@ public class ReplicatorWriter implements SinkWriter {
             }
         } catch (Exception e) {
             log.error("Error during write operation.", e);
-//            throw e;
+            throw e;
         }
         long deltaTime = Math.max(System.currentTimeMillis() - startTime, 1);
         log.info("[Task {}] Process {} records in {} ms, speed {} records/sec", taskId, sinkRecords.size(), deltaTime, (sinkRecords.size() * 1000) / deltaTime);

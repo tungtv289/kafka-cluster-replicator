@@ -31,7 +31,12 @@ public class ReplicatorSinkTask extends SinkTask {
         if (collection.isEmpty()) {
             return;
         }
-        sinkWriter.writer(collection);
+        try {
+            sinkWriter.writer(collection);
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage());
+        }
+
     }
 
     @Override

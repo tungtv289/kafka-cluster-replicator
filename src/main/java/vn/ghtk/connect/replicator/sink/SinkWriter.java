@@ -6,5 +6,5 @@ import java.util.Collection;
 
 public interface SinkWriter {
 
-    void writer(Collection<SinkRecord> sinkRecords);
+    void writer(Collection<SinkRecord> sinkRecords) throws Exception;
 }

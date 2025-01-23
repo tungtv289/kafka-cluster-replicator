@@ -130,10 +130,10 @@ class KafkaRecordConverterTest {
                 .put("ts_us", null)
                 .put("ts_ns", null);
 
-        System.out.println(envelope);
-
         when(sinkRecord.valueSchema()).thenReturn(envelopeSchema);
         when(sinkRecord.value()).thenReturn(envelope);
+
+        System.out.println(envelope);
 
         KafkaRecord result = KafkaRecordConverter.convert(sinkRecord);
 
