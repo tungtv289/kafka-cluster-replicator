@@ -3,7 +3,6 @@ package vn.ghtk.connect.replicator.utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.confluent.connect.avro.AvroData;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.connect.data.ConnectSchema;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
@@ -25,7 +24,9 @@ public class KafkaRecordConverter {
             kafkaRecord.key = new KafkaRecord.Key();
             kafkaRecord.key.data = extractJsonNode(sinkRecord.key(), sinkRecord.keySchema());
             kafkaRecord.key.type = determineType(sinkRecord.keySchema(), sinkRecord.key());
-            if (sinkRecord.keySchema() != null) {
+            if (sinkRecord.keySchema() != null &&
+                    kafkaRecord.key.type == KafkaRecord.Type.AVRO
+            ) {
                 kafkaRecord.key.schema = convertConnectSchemaToAvroSchema(sinkRecord.keySchema());
             }
         }
@@ -34,7 +35,9 @@ public class KafkaRecordConverter {
             kafkaRecord.value = new KafkaRecord.Value();
             kafkaRecord.value.data = extractJsonNode(sinkRecord.value(), sinkRecord.valueSchema());
             kafkaRecord.value.type = determineType(sinkRecord.valueSchema(), sinkRecord.value());
-            if (sinkRecord.valueSchema() != null) {
+            if (sinkRecord.valueSchema() != null &&
+                    kafkaRecord.key.type == KafkaRecord.Type.AVRO
+            ) {
                 kafkaRecord.value.schema = convertConnectSchemaToAvroSchema(sinkRecord.valueSchema());
             }
         }
@@ -59,7 +62,7 @@ public class KafkaRecordConverter {
                 } else {
                     value = structToMap((Struct) value);
                 }
-            }  else if (field.schema().isOptional() && value != null) {
+            } else if (field.schema().isOptional() && value != null) {
                 Map<String, Object> optionalMap = new HashMap<>();
                 optionalMap.put(field.schema().type().getName(), value);
                 value = optionalMap;
@@ -83,14 +86,14 @@ public class KafkaRecordConverter {
     }
 
     private static KafkaRecord.Type determineType(Schema schema, Object data) {
-        if (schema == null && data instanceof String) {
-            return KafkaRecord.Type.STRING;
-        } else if (schema == null && data instanceof byte[]) {
-            return KafkaRecord.Type.BINARY;
-        } else if (schema != null) {
-            return KafkaRecord.Type.AVRO;
-        }
-        return KafkaRecord.Type.STRING;
+//        if (schema == null && data instanceof String) {
+//            return KafkaRecord.Type.STRING;
+//        } else if (schema == null && data instanceof byte[]) {
+//            return KafkaRecord.Type.BINARY;
+//        } else if (schema != null) {
+//            return KafkaRecord.Type.AVRO;
+//        }
+        return KafkaRecord.Type.JSON;
     }
 
     /**

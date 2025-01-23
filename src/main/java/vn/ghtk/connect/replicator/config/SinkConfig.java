@@ -26,7 +26,7 @@ public class SinkConfig extends AbstractConfig {
     private static final String KAFKA_REST_PASSWORD_DEFAULT = null;
 
     public static final String BATCH_SIZE = "batch.size";
-    private static final int BATCH_SIZE_DEFAULT = 3000;
+    private static final int BATCH_SIZE_DEFAULT = 10;
     private static final String BATCH_SIZE_DOC =
             "Specifies how many records to attempt to batch together for insertion into the destination"
                     + " topic, when possible.";

@@ -42,12 +42,11 @@ public class HttpKafkaClientImpl implements KafkaService {
     public int executeBatch(List<KafkaRecord> records, TopicId topic) throws IOException {
 //        String endpoint = String.format("%s/v3/clusters/%s/topics/%s/records", baseUrl, clusterId, topic.topicName());
         String endpoint = String.format("%s/v3/clusters/%s/topics/%s/records:batch", baseUrl, clusterId, "admin_service_db_avro");
-        log.info(endpoint);
         // Prepare payload
         KafkaRestV3Payload payload = new KafkaRestV3Payload(records);
         // Serialize payload to JSON
         String jsonPayload = objectMapper.writeValueAsString(payload);
-        log.info(jsonPayload);
+        log.debug(jsonPayload);
         // Prepare HTTP POST request
         HttpPost httpRequest = new HttpPost(endpoint);
         httpRequest.setEntity(new StringEntity(jsonPayload, ContentType.APPLICATION_JSON.withCharset("utf-8")));
@@ -57,7 +56,7 @@ public class HttpKafkaClientImpl implements KafkaService {
         httpRequest.setHeader("Content-Type", "application/json");
 
         HttpResponseText httpData = httpService.execute(httpRequest);
-        log.error(httpData.getText());
+//        log.debug(httpData.getText());
         return httpData.getCode();
     }
 

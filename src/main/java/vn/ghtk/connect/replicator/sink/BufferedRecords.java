@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import static java.util.Objects.isNull;
+
 @Slf4j
 public class BufferedRecords {
 
@@ -47,9 +49,16 @@ public class BufferedRecords {
             keySchema = record.keySchema();
             schemaChanged = true;
         }
-        if (Objects.equals(valueSchema, record.valueSchema())) {
-            flushed.addAll(flush());
-        } else {
+        if (isNull(record.valueSchema())) {
+
+        }
+        else if (Objects.equals(valueSchema, record.valueSchema())) {
+//            if (config.deleteEnabled && deletesInBatch) {
+//                // flush so an insert after a delete of same record isn't lost
+//                flushed.addAll(flush());
+//            }
+        }
+        else {
             // value schema is not null and has changed. This is a real schema change.
             valueSchema = record.valueSchema();
             schemaChanged = true;
@@ -96,7 +105,6 @@ public class BufferedRecords {
 
     private void executeProducer(List<KafkaRecord> idxRecords) throws KafkaRestBatchUpdateException, IOException {
         int batchStatus = kafkaService.executeBatch(idxRecords, topicName);
-        log.info(String.valueOf(batchStatus));
         if (batchStatus != 207) {
             throw new KafkaRestBatchUpdateException(
                     "Execution failed for part of the batch update: " + batchStatus);
